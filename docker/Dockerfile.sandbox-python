@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+#
+# The image DockerSandbox spins up one throwaway, network-disabled
+# container from per execution (see sandbox.docker_images.python in
+# configs/prod.yaml, which must name this image after it's built:
+#   docker build -f docker/Dockerfile.sandbox-python -t vulnrem-sandbox-python:latest .
+#
+# Deliberately minimal: only what the generated PoC/test code and the
+# target source module themselves need at runtime.
+FROM python:3.12-slim
+
+RUN pip install --no-cache-dir "pytest>=7,<9"
+
+# A non-root user, since this container runs arbitrary LLM-generated code.
+# Combined with network_disabled + a memory limit (both set by
+# DockerSandbox per-run), this bounds what a malicious or buggy generated
+# script can actually do even though it is not a hardened gVisor/Kata-level
+# sandbox.
+RUN useradd --create-home --uid 10001 sandboxrunner
+USER sandboxrunner
+
+WORKDIR /workspace

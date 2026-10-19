@@ -1,0 +1,73 @@
+# Self-hosted deployment topology (see docs/SETUP_DEPLOYMENT.md for the
+# Hugging Face Spaces alternative, which does not use this file at all).
+#
+# Before `docker compose up`:
+#   1. Build the sandbox image (not a long-lived service, so it's not
+#      defined below -- see docker/Dockerfile.sandbox-python):
+#        docker build -f docker/Dockerfile.sandbox-python -t vulnrem-sandbox-python:latest ..
+#   2. Put your fine-tuned LoRA adapters under ./models/adapters/ (see
+#      docs/SETUP_DEPLOYMENT.md for the expected layout).
+#   3. Create a ./data directory (MLflow's sqlite file and any dataset
+#      files live there) and copy in your dataset if you want to run
+#      evaluation/fine-tuning commands inside the dashboard container.
+
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    command:
+      - --model=Qwen/Qwen3-Coder-30B-A3B-Instruct
+      - --enable-lora
+      - --lora-modules=patcher-python-lora=/models/adapters/patcher-python
+        test-writer-python-lora=/models/adapters/test-writer-python
+      - --quantization=awq
+      - --gpu-memory-utilization=0.90
+      - --max-model-len=8192
+    volumes:
+      - ../models:/models
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: ["gpu"]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/models')"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dashboard
+    environment:
+      VULNREM_ENV: prod
+      VLLM_BASE_URL: http://vllm:8000/v1
+      MLFLOW_TRACKING_URI: sqlite:////data/mlflow.db
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+    volumes:
+      # "Docker-outside-of-Docker": lets the Sandbox inside this container
+      # talk to the HOST's Docker daemon to start sibling
+      # vulnrem-sandbox-python containers. The container process needs
+      # permission to use this socket -- see docs/SETUP_DEPLOYMENT.md if
+      # you hit a permission-denied error here.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../data:/data
+    ports:
+      - "7860:7860"
+    depends_on:
+      vllm:
+        condition: service_healthy
+
+  mlflow-ui:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dashboard  # already has mlflow installed; only used for its CLI here
+    command: ["python", "-m", "mlflow", "ui", "--backend-store-uri", "sqlite:////data/mlflow.db", "--host", "0.0.0.0", "--port", "5000"]
+    volumes:
+      - ../data:/data
+    ports:
+      - "5000:5000"
