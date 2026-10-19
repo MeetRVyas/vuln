@@ -1,0 +1,71 @@
+[project]
+name = "vulnrem"
+version = "0.1.0"
+description = "Automated code refinement & vulnerability remediation via local LLM orchestration (SAST -> Localizer -> Patcher -> Verifier -> Judge)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "docker>=7.2.0",
+    "google-genai>=2.25.0",
+    "httpx>=0.28.1",
+    "langgraph>=1.2.12",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "pyyaml>=6.0.3",
+    "tenacity>=9.1.4",
+]
+
+[project.optional-dependencies]
+dashboard = [
+    "gradio>=4",
+]
+tracking = [
+    "mlflow>=2",
+]
+finetune = [
+    "accelerate>=1.15.0",
+    "bitsandbytes>=0.50.2",
+    "datasets>=5.0.1",
+    "peft>=0.21.0",
+    "torch>=2.14.0",
+    "transformers>=5.17.0",
+    "trl>=1.13.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "bandit>=1.9.4",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "pytest-mock>=3.15.1",
+    "respx>=0.23.1",
+    "ruff>=0.16.8",
+]
+
+[project.scripts]
+vulnrem = "vulnrem.cli.main:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: end-to-end pipeline tests (may be slower)",
+    "requires_docker: skipped automatically when no Docker daemon is reachable",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::_pytest.warning_types.PytestCollectionWarning",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.coverage.run]
+source = ["src/vulnrem"]

@@ -1,0 +1,26 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Project-specific
+.env
+*.log
+mlruns/
+mlartifacts/
+mlflow.db
+*.sqlite3
+data/raw/
+data/processed/
+*.jsonl.bak
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+outputs/

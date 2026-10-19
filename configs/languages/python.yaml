@@ -1,0 +1,46 @@
+# Language spec for Python (Phase 1 / MVP language, per project plan answer 1).
+#
+# `debugger_status: not_implemented` and `sanitizer_status: not_applicable`
+# are intentional: the Debugger-in-the-loop escalation is an Ambitious-tier
+# capability (see docs/ARCHITECTURE.md) out of scope for this Strong-tier
+# MVP, and dynamic sanitizers (ASan/UBSan) are a C-language concept with no
+# Python equivalent.
+
+file_extensions:
+  - ".py"
+
+test_framework: pytest
+
+debugger_status: not_implemented
+sanitizer_status: not_applicable
+
+cwes:
+  - id: "CWE-89"
+    name: "SQL Injection"
+    description: >
+      Untrusted input is concatenated or interpolated directly into a SQL
+      query string instead of being passed as a bound parameter, allowing an
+      attacker to alter the query's structure or logic.
+
+  - id: "CWE-78"
+    name: "OS Command Injection"
+    description: >
+      Untrusted input reaches a shell/subprocess invocation (e.g. os.system,
+      subprocess with shell=True, or unsanitized argument lists) in a way
+      that lets an attacker inject additional commands or arguments.
+
+  - id: "CWE-22"
+    name: "Path Traversal"
+    description: >
+      Untrusted input is used to build a filesystem path without
+      normalizing and validating it against an allowed base directory,
+      letting an attacker read or write files outside the intended
+      directory via sequences such as `../`.
+
+  - id: "CWE-798"
+    name: "Use of Hard-coded Credentials"
+    description: >
+      A password, API key, token, or other credential is embedded directly
+      in source code rather than supplied via configuration or a secrets
+      manager, exposing it to anyone with source access and making
+      rotation impossible without a code change.

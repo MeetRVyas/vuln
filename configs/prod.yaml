@@ -1,0 +1,108 @@
+# Production / deployed configuration.
+#
+# This one file serves TWO different deployment topologies (see
+# docs/SETUP_DEPLOYMENT.md for the full explanation):
+#
+#   A) Self-hosted docker-compose stack (dashboard + vLLM + Docker-socket
+#      access for the Sandbox), all on one GPU machine you control. This is
+#      the default below: llm.active_provider=vllm, sandbox=docker.
+#
+#   B) Hugging Face Spaces (the user-facing demo deployment). A Space's
+#      container has NO Docker socket, NO privileged mode, and (on the free
+#      tier) no GPU -- it CANNOT spin up further Docker containers for the
+#      Sandbox, and usually can't reach a local vLLM server either. Running
+#      there means setting these two environment variables at deploy time:
+#        VULNREM_LLM_PROVIDER=google
+#        VULNREM_SANDBOX_IMPL=subprocess
+#      (plus GOOGLE_API_KEY). The dashboard code and pipeline are identical
+#      either way -- only these two values change.
+
+enabled_languages:
+  - python
+
+llm:
+  active_provider: "${VULNREM_LLM_PROVIDER:-vllm}"
+  providers:
+    mock:
+      kind: mock
+      enabled: true
+      models:
+        default: mock-model
+
+    google:
+      kind: google
+      enabled: true
+      api_key_env_var: GOOGLE_API_KEY
+      timeout_s: 60
+      max_retries: 3
+      models:
+        default: gemini-2.5-flash
+        per_role:
+          judge: gemini-2.5-flash
+          patcher: gemini-2.5-flash
+          reproducer: gemini-2.5-flash
+
+    vllm:
+      kind: vllm
+      enabled: true
+      base_url: "${VLLM_BASE_URL:-http://vllm:8000/v1}"
+      timeout_s: 180
+      max_retries: 3
+      models:
+        default: qwen3-coder-30b-a3b-instruct
+        per_role:
+          patcher: patcher-python-lora
+          test_writer: test-writer-python-lora
+
+sandbox:
+  implementation: "${VULNREM_SANDBOX_IMPL:-docker}"
+  timeout_s: 30
+  memory_limit_mb: 768
+  cpu_limit_seconds: 20
+  network_disabled: true
+  docker_images:
+    python: "vulnrem-sandbox-python:latest"
+
+sast:
+  tools_by_language:
+    python:
+      - name: opengrep
+        enabled: true
+        timeout_s: 90
+        extra_args: []
+      - name: bandit
+        enabled: true
+        timeout_s: 45
+        extra_args: []
+
+hardware:
+  override_profile: null
+  fallback_profile: medium
+
+retry:
+  max_normal_retries: 4
+  max_escalation_attempts: 2
+  max_test_writer_self_validation_attempts: 2
+
+tracking:
+  # See configs/dev.yaml note: `file:` MLflow stores are in maintenance mode
+  # as of MLflow 3.x. Point MLFLOW_TRACKING_URI at a real server
+  # (http://...) or leave the sqlite default for a single-machine deployment.
+  implementation: mlflow
+  tracking_uri: "${MLFLOW_TRACKING_URI:-sqlite:///mlflow.db}"
+  experiment_name: vulnrem-prod
+
+logging:
+  level: INFO
+  json_format: true
+  redact_secrets: true
+  max_code_chars_in_logs: 2000
+
+evaluation:
+  held_out_fraction: 0.2
+  random_seed: 42
+  min_cases_per_stratum: 1
+  manifest_path: data/splits/manifest.json
+
+data_dir: /data
+output_dir: /outputs

@@ -1,0 +1,99 @@
+# Development configuration.
+#
+# Safe defaults for running the pipeline and its tests entirely on a laptop
+# with no GPU, no Docker daemon, and no cloud credentials: the mock LLM
+# provider, the subprocess sandbox, and in-memory experiment tracking.
+#
+# To exercise the Google provider locally, export GOOGLE_API_KEY and switch
+# `llm.active_provider` to `google` (or override via the
+# VULNREM_LLM_PROVIDER env var if you wire that into your entrypoint).
+
+enabled_languages:
+  - python
+
+llm:
+  active_provider: google
+  providers:
+    mock:
+      kind: mock
+      enabled: true
+      models:
+        default: mock-model
+
+    google:
+      kind: google
+      enabled: true
+      api_key_env_var: GOOGLE_API_KEY
+      timeout_s: 60
+      max_retries: 2
+      models:
+        default: gemini-3.5-flash-lite
+        per_role:
+          judge: gemini-3.5-flash-lite
+          patcher: gemini-3.5-flash-lite
+          reproducer: gemini-3.5-flash-lite
+
+    vllm:
+      kind: vllm
+      enabled: true
+      base_url: "${VLLM_BASE_URL:-http://localhost:8000/v1}"
+      timeout_s: 120
+      max_retries: 2
+      models:
+        default: qwen3-coder-30b-a3b-instruct
+        per_role:
+          patcher: patcher-python-lora
+          test_writer: test-writer-python-lora
+
+sandbox:
+  implementation: subprocess
+  timeout_s: 20
+  memory_limit_mb: 512
+  cpu_limit_seconds: 15
+  network_disabled: true
+  docker_images:
+    python: "vulnrem-sandbox-python:latest"
+
+sast:
+  tools_by_language:
+    python:
+      - name: opengrep
+        enabled: true
+        timeout_s: 60
+        extra_args: []
+      - name: bandit
+        enabled: true
+        timeout_s: 30
+        extra_args: []
+
+hardware:
+  override_profile: null
+  fallback_profile: small
+
+retry:
+  max_normal_retries: 4
+  max_escalation_attempts: 2
+  max_test_writer_self_validation_attempts: 2
+
+tracking:
+  # NOTE: MLflow 3.x put the `file:` tracking backend into maintenance mode
+  # (it now raises unless MLFLOW_ALLOW_FILE_STORE=true is set) -- sqlite is
+  # the recommended lightweight, no-server, no-signup backend instead.
+  implementation: in_memory
+  tracking_uri: "sqlite:///mlflow.db"
+  experiment_name: vulnrem-dev
+
+logging:
+  level: DEBUG
+  json_format: false
+  redact_secrets: true
+  max_code_chars_in_logs: 2000
+
+evaluation:
+  held_out_fraction: 0.2
+  random_seed: 42
+  min_cases_per_stratum: 1
+  manifest_path: data/splits/manifest.json
+
+data_dir: data
+output_dir: outputs

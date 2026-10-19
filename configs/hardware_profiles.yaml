@@ -1,0 +1,50 @@
+# GPU hardware profiles for the local vLLM serving stack.
+#
+# Selection order (see vulnrem.config.hardware.resolve_hardware_profile):
+#   1. hardware.override_profile in dev/prod.yaml, if set
+#   2. best-effort auto-detection via `nvidia-smi` (VRAM bucketed into a
+#      profile by min/max_vram_gb)
+#   3. hardware.fallback_profile
+#
+# Add a new profile by adding a new key here -- nothing else in the codebase
+# needs to change.
+
+profiles:
+  small:
+    description: "Single consumer GPU, ~16-24GB VRAM (e.g. RTX 4080/4090)."
+    min_vram_gb: 0
+    max_vram_gb: 24
+    quantization: awq
+    gpu_memory_utilization: 0.85
+    max_concurrent_requests: 2
+    max_model_len: 4096
+    kv_cache_dtype: fp8
+    notes: >
+      Aggressive quantization required to fit the 30B-A3B MoE base model.
+      Expect noticeably higher latency and a smaller usable context window.
+
+  medium:
+    description: "~24-48GB VRAM class (e.g. A6000, L40S, 2x24GB)."
+    min_vram_gb: 24
+    max_vram_gb: 48
+    quantization: int8
+    gpu_memory_utilization: 0.90
+    max_concurrent_requests: 4
+    max_model_len: 8192
+    kv_cache_dtype: auto
+    notes: >
+      Matches the project plan's originally-assumed ~48GB-class GPU. Good
+      balance of quality, context length, and throughput.
+
+  large:
+    description: "80GB+ class (A100/H100) or multi-GPU."
+    min_vram_gb: 48
+    max_vram_gb: null
+    quantization: bf16
+    gpu_memory_utilization: 0.92
+    max_concurrent_requests: 8
+    max_model_len: 16384
+    kv_cache_dtype: auto
+    notes: >
+      Minimal quantization needed; largest usable context window and
+      concurrency. Use this profile for fine-tuning runs as well as serving.
